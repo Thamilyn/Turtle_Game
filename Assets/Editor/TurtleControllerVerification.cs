@@ -25,9 +25,11 @@ namespace TurtleGame.Editor
 
         public static void Run()
         {
-            if (!File.Exists(TurtlePrototypeBuilder.ScenePath))
+            string scenePath = File.Exists("Assets/Scenes/TurtlePrototype.unity")
+                ? "Assets/Scenes/TurtlePrototype.unity" : TurtlePrototypeBuilder.ScenePath;
+            if (!File.Exists(scenePath))
                 throw new InvalidOperationException("Generate the prototype before verification.");
-            EditorSceneManager.OpenScene(TurtlePrototypeBuilder.ScenePath);
+            EditorSceneManager.OpenScene(scenePath);
             SessionState.SetBool(PendingKey, true);
             EditorApplication.isPlaying = true;
         }
@@ -76,6 +78,10 @@ namespace TurtleGame.Editor
         private static IEnumerator Verify()
         {
             const float dt = 1f / 60f;
+            Assert(player.Visual != null && player.Visual != player.transform
+                && player.Visual.IsChildOf(player.transform)
+                && player.Visual.gameObject.activeInHierarchy,
+                "Active model rotates beneath the physics root");
             var directions = new[] { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
             float straightDistance = 0f;
             foreach (Vector2 direction in directions)
@@ -95,6 +101,7 @@ namespace TurtleGame.Editor
                     "No lateral drift " + direction);
                 Assert(Quaternion.Angle(player.Visual.rotation, Quaternion.LookRotation(expected)) < 1f,
                     "Visual faces movement " + direction);
+                AssertModelHeading(expected);
                 Assert(Quaternion.Angle(player.transform.rotation, Quaternion.identity) < 0.01f,
                     "Physics root keeps world orientation");
                 straightDistance = distance;
@@ -112,6 +119,22 @@ namespace TurtleGame.Editor
             Assert(Mathf.Abs(diagonalDisplacement.magnitude - straightDistance) < 0.05f,
                 "Diagonal speed matches cardinal speed");
 
+            foreach (Vector2 direction in new[]
+                { Vector2.one, new Vector2(-1f, 1f), -Vector2.one, new Vector2(1f, -1f) })
+            {
+                ResetPlayer(new Vector3(0f, 0.05f, -4f));
+                for (int frame = 0; frame < 30; frame++)
+                {
+                    player.Move(direction, dt);
+                    yield return null;
+                }
+                Assert(Quaternion.Angle(player.Visual.rotation,
+                    Quaternion.LookRotation(new Vector3(direction.x, 0f, direction.y))) < 1f,
+                    "Visual faces diagonal " + direction);
+                AssertModelHeading(new Vector3(direction.x, 0f, direction.y));
+            }
+
+            Quaternion stoppedHeading = player.Visual.rotation;
             for (int frame = 0; frame < 20; frame++)
             {
                 player.Move(Vector2.zero, dt);
@@ -125,6 +148,8 @@ namespace TurtleGame.Editor
             }
             Assert(Vector3.Distance(stopped, player.transform.position) < 0.005f, "Braking reaches rest");
             Assert(player.IsGrounded, "Player stays grounded");
+            Assert(Quaternion.Angle(player.Visual.rotation, stoppedHeading) < 0.01f,
+                "Releasing WASD preserves the last heading");
 
             ResetPlayer(new Vector3(0f, 4f, -4f));
             for (int frame = 0; frame < 90; frame++)
@@ -191,6 +216,25 @@ namespace TurtleGame.Editor
             player.enabled = true;
             player.ReadKeyboard = false;
             Physics.SyncTransforms();
+        }
+
+        private static void AssertModelHeading(Vector3 expected)
+        {
+            Transform head = null;
+            Transform tail = null;
+            foreach (Transform child in player.Visual.GetComponentsInChildren<Transform>())
+            {
+                if (child.name == "cabeza") head = child;
+                if (child.name == "cola") tail = child;
+            }
+            if (head == null || tail == null)
+                return;
+            Assert(Vector3.Dot(player.Visual.GetChild(0).up, Vector3.up) > 0.999f,
+                "Turtle stays upright while turning");
+            Vector3 forward = head.position - tail.position;
+            forward.y = 0f;
+            Assert(Vector3.Dot(forward.normalized, expected.normalized) > 0.999f,
+                "Turtle head faces movement " + expected);
         }
 
         private static void Assert(bool condition, string description)

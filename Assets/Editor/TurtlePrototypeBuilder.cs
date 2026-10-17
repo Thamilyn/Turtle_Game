@@ -80,8 +80,8 @@ namespace TurtleGame.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.fieldOfView = 55f;
             cameraObject.AddComponent<AudioListener>();
-            cameraObject.transform.position = player.transform.position + new Vector3(0f, 7f, -8f);
-            cameraObject.transform.LookAt(player.transform.position + Vector3.up * 0.4f);
+            cameraObject.transform.position = player.transform.position + new Vector3(0f, 0.621f, -1.281f);
+            cameraObject.transform.LookAt(player.transform.position + Vector3.up * 0.43298f);
             cameraObject.AddComponent<TurtleFollowCamera>().Target = player.transform;
 
             var moon = new GameObject("Moonlight").AddComponent<Light>();
