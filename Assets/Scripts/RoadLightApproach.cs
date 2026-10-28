@@ -9,9 +9,9 @@ namespace TurtleGame
     {
         [SerializeField] private Transform target;
         [SerializeField] private Vector3 destination = new Vector3(0f, 0f, 124f);
-        [SerializeField, Min(1f)] private float fadeStartDistance = 110f;
+        [SerializeField, Min(1f)] private float fadeStartDistance = 30f;
         [SerializeField, Min(0f)] private float fullIntensityDistance = 12f;
-        [SerializeField, Range(0f, 1f)] private float initialBrightness = 0.08f;
+        [SerializeField, Range(0f, 1f)] private float initialBrightness = 0f;
         private readonly List<Light> lights = new List<Light>();
         private readonly List<float> intensities = new List<float>();
         private readonly List<Renderer> bulbs = new List<Renderer>();
@@ -61,11 +61,15 @@ namespace TurtleGame
             float brightness = Mathf.Lerp(initialBrightness, 1f, Mathf.SmoothStep(0f, 1f, progress));
             for (int i = 0; i < lights.Count; i++)
                 if (lights[i] != null)
+                {
+                    lights[i].enabled = brightness > 0f;
                     lights[i].intensity = intensities[i] * brightness;
+                }
             for (int i = 0; i < bulbs.Count; i++)
             {
                 if (bulbs[i] == null)
                     continue;
+                bulbs[i].enabled = brightness > 0f;
                 bulbs[i].GetPropertyBlock(properties);
                 properties.SetColor(EmissionColor, emissions[i] * brightness);
                 bulbs[i].SetPropertyBlock(properties);
@@ -76,11 +80,15 @@ namespace TurtleGame
         {
             for (int i = 0; i < lights.Count; i++)
                 if (lights[i] != null)
+                {
+                    lights[i].enabled = true;
                     lights[i].intensity = intensities[i];
+                }
             for (int i = 0; i < bulbs.Count; i++)
             {
                 if (bulbs[i] == null)
                     continue;
+                bulbs[i].enabled = true;
                 bulbs[i].GetPropertyBlock(properties);
                 properties.SetColor(EmissionColor, emissions[i]);
                 bulbs[i].SetPropertyBlock(properties);

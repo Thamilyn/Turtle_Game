@@ -99,15 +99,18 @@ namespace TurtleGame.Editor
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.20f, 0.25f, 0.37f);
+            RenderSettings.ambientLight = new Color(0.2f, 0.24f, 0.32f);
+            RenderSettings.ambientIntensity = 1f;
+            RenderSettings.reflectionIntensity = 0f;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = new Color(0.045f, 0.065f, 0.115f);
             RenderSettings.fogDensity = 0.009f;
-            var moon = new GameObject("Cool night fill").AddComponent<Light>();
+            // Broad moonlight keeps the route readable while the floating moon guides the player.
+            var moon = new GameObject("Moonlight").AddComponent<Light>();
             moon.type = LightType.Directional;
             moon.color = new Color(0.58f, 0.71f, 1f);
-            moon.intensity = 0.65f;
+            moon.intensity = 0.55f;
             moon.shadows = LightShadows.Soft;
             moon.transform.rotation = Quaternion.Euler(28f, -130f, 0f);
 
@@ -152,6 +155,7 @@ namespace TurtleGame.Editor
             camera.farClipPlane = 260f;
             cameraObject.AddComponent<AudioListener>();
             cameraObject.AddComponent<TurtleFollowCamera>().Target = player.transform;
+
             cameraObject.AddComponent<RoadLightApproach>();
             cameraObject.AddComponent<MoonFairyGuide>();
             cameraObject.transform.position = player.transform.position + new Vector3(0f, 0.621f, -1.281f);

@@ -20,7 +20,7 @@ RenderSettings:
   m_FogDensity: 0.009
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.2, g: 0.25, b: 0.37, a: 1}
+  m_AmbientSkyColor: {r: 0.2, g: 0.24, b: 0.32, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
   m_AmbientIntensity: 1
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 1
+  m_ReflectionIntensity: 0
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
   m_UseRadianceAmbientProbe: 0
@@ -1067,7 +1067,7 @@ GameObject:
   - component: {fileID: 119298244}
   - component: {fileID: 119298246}
   m_Layer: 0
-  m_Name: Cool night fill
+  m_Name: Moonlight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1084,7 +1084,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 0.58, g: 0.71, b: 1, a: 1}
-  m_Intensity: 0.65
+  m_Intensity: 0.55
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -7958,9 +7958,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 0}
   destination: {x: 0, y: 0, z: 124}
-  fadeStartDistance: 110
+  fadeStartDistance: 30
   fullIntensityDistance: 12
-  initialBrightness: 0.08
+  initialBrightness: 0
 --- !u!114 &2099000002
 MonoBehaviour:
   m_ObjectHideFlags: 0

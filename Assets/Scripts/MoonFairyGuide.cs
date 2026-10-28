@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace TurtleGame
 {
-    /// <summary>A small floating guide that waits ahead along the beach route.</summary>
+    /// <summary>A floating moon that waits ahead along the moonlit beach route.</summary>
     [DisallowMultipleComponent]
     public sealed class MoonFairyGuide : MonoBehaviour
     {
@@ -39,23 +39,26 @@ namespace TurtleGame
             if (target == null || beach == null)
                 return;
 
+            ConfigureMoonlight();
             waypoint = 0;
             basePosition = PositionAt(Route[0]);
             fairy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            fairy.name = "Moon fairy - guiding glow";
+            fairy.name = "Guiding moon";
             Destroy(fairy.GetComponent<Collider>());
-            fairy.transform.localScale = Vector3.one * 0.14f;
+            fairy.transform.localScale = Vector3.one * 0.4f;
             fairy.transform.position = basePosition;
             glowMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
             glowMaterial.color = glowColor;
             glowMaterial.EnableKeyword("_EMISSION");
-            glowMaterial.SetColor("_EmissionColor", glowColor * 4f);
+            glowMaterial.SetColor("_EmissionColor", glowColor * 1.5f);
             fairy.GetComponent<Renderer>().sharedMaterial = glowMaterial;
             glow = fairy.AddComponent<Light>();
             glow.type = LightType.Point;
             glow.color = glowColor;
-            glow.range = 3f;
-            glow.intensity = 1.2f;
+            glow.range = 10f;
+            glow.intensity = 0.35f;
+            glow.shadows = LightShadows.Soft;
+            glow.bounceIntensity = 0f;
             var trail = fairy.AddComponent<TrailRenderer>();
             trailMaterial = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             trailMaterial.SetFloat("_Surface", 1f);
@@ -72,6 +75,43 @@ namespace TurtleGame
             trail.startColor = glowColor;
             trail.endColor = new Color(glowColor.r, glowColor.g, glowColor.b, 0f);
             trail.minVertexDistance = 0.03f;
+        }
+
+        // Apply at Play startup as well, so an already-open scene receives the lighting update.
+        private void ConfigureMoonlight()
+        {
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.2f, 0.24f, 0.32f);
+            RenderSettings.ambientIntensity = 1f;
+            RenderSettings.reflectionIntensity = 0f;
+            Light moonlight = null;
+            foreach (var root in gameObject.scene.GetRootGameObjects())
+            {
+                foreach (var light in root.GetComponentsInChildren<Light>(true))
+                {
+                    if (light.name == "Moonlight" || light.name == "Cool night fill")
+                    {
+                        moonlight = light;
+                        break;
+                    }
+                }
+                if (moonlight != null)
+                    break;
+            }
+            if (moonlight == null)
+            {
+                var source = new GameObject("Moonlight");
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(source, gameObject.scene);
+                moonlight = source.AddComponent<Light>();
+            }
+            moonlight.gameObject.SetActive(true);
+            moonlight.enabled = true;
+            moonlight.type = LightType.Directional;
+            moonlight.color = new Color(0.58f, 0.71f, 1f);
+            moonlight.intensity = 0.55f;
+            moonlight.shadows = LightShadows.Soft;
+            moonlight.transform.rotation = Quaternion.Euler(28f, -130f, 0f);
+            RenderSettings.sun = moonlight;
         }
 
         private Vector3 PositionAt(Vector2 point)
@@ -96,7 +136,7 @@ namespace TurtleGame
             float time = Time.time;
             fairy.transform.position = basePosition + new Vector3(Mathf.Sin(time * 1.7f) * 0.16f,
                 Mathf.Sin(time * 2.8f) * 0.12f, 0f);
-            glow.intensity = 1.2f + Mathf.Sin(time * 3f) * 0.25f;
+            glow.intensity = 0.35f + Mathf.Sin(time * 1.5f) * 0.02f;
         }
 
         private void OnDisable()
