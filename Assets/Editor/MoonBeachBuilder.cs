@@ -97,7 +97,7 @@ namespace TurtleGame.Editor
             log.transform.rotation = Quaternion.Euler(0f, 22f, 90f);
             Shape("Route obstacle - split passage", PrimitiveType.Sphere, Ground(PathX(85f), 85f) + Vector3.up * 0.7f, new Vector3(4f, 2f, 3f), rock, true);
 
-            RenderSettings.skybox = null;
+            RenderSettings.skybox = NightSkySetup.CreateNightMaterial();
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.2f, 0.24f, 0.32f);
             RenderSettings.ambientIntensity = 1f;
@@ -149,7 +149,7 @@ namespace TurtleGame.Editor
             var cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
             var camera = cameraObject.AddComponent<Camera>();
-            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.clearFlags = CameraClearFlags.Skybox;
             camera.backgroundColor = RenderSettings.fogColor;
             camera.fieldOfView = 60f;
             camera.farClipPlane = 260f;
@@ -157,10 +157,13 @@ namespace TurtleGame.Editor
             cameraObject.AddComponent<TurtleFollowCamera>().Target = player.transform;
 
             cameraObject.AddComponent<RoadLightApproach>();
-            cameraObject.AddComponent<MoonFairyGuide>();
+            cameraObject.AddComponent<MoonFairyGuide>().MoonMaterial =
+                AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/GuidingMoon.mat");
             cameraObject.transform.position = player.transform.position + new Vector3(0f, 0.621f, -1.281f);
             cameraObject.transform.LookAt(player.transform.position + Vector3.up * 0.43298f);
 
+            DuneRockInstaller.ReplaceDuneRocks(scene);
+            RouteObstacleInstaller.ReplaceObstacles(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
             Debug.Log("MOON_BEACH_OK: " + ScenePath);

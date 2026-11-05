@@ -69,6 +69,7 @@ namespace TurtleGame.Editor
             placeholder.transform.SetParent(visual, false);
             placeholder.transform.localPosition = new Vector3(0f, 0.4f, 0f);
             player.AddComponent<TurtlePlayerController>().Visual = visual;
+            player.AddComponent<TurtleWalkAnimation>();
             PrefabUtility.SaveAsPrefabAsset(player, PrefabPath);
             Object.DestroyImmediate(player);
             player = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath), scene);

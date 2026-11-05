@@ -60,6 +60,13 @@ namespace TurtleGame.Editor
                     return;
                 scene = EditorSceneManager.OpenScene(ScenePath);
             }
+            RenderSettings.skybox = null;
+            foreach (var camera in scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<Camera>(true)))
+            {
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Color.black;
+            }
             var text = scene.GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<TextMeshProUGUI>(true))
                 .FirstOrDefault(candidate => candidate.text.Contains("thousands of baby sea turtles"));

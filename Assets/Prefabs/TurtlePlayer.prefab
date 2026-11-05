@@ -43,6 +43,7 @@ GameObject:
   - component: {fileID: 458258325730274262}
   - component: {fileID: 1006639750169220335}
   - component: {fileID: 1394363227622999633}
+  - component: {fileID: 6701440162733657171}
   m_Layer: 0
   m_Name: TurtlePlayer
   m_TagString: Untagged
@@ -110,6 +111,25 @@ MonoBehaviour:
   gravity: -20
   terminalFallSpeed: 30
   visual: {fileID: 6851516398897174752}
+--- !u!114 &6701440162733657171
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2021027421241052995}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c561501d0abb493284c831ce65c41989, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::TurtleGame.TurtleWalkAnimation
+  strideLength: 1.2
+  flipperSweep: 22
+  flipperLift: 12
+  blendTime: 0.15
+  bodyBob: 0.008
+  headNod: 3
+  tailSwing: 6
 --- !u!1 &5717140256345065805
 GameObject:
   m_ObjectHideFlags: 0

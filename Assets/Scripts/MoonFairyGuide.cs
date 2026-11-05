@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TurtleGame
@@ -10,6 +11,8 @@ namespace TurtleGame
         [SerializeField, Min(0.1f)] private float speed = 2.4f;
         [SerializeField, Min(1f)] private float waitDistance = 4f;
         [SerializeField, Min(0.3f)] private float hoverHeight = 1.6f;
+        [SerializeField, Min(0.4f)] private float obstacleClearance = 0.65f;
+        [SerializeField] private Material moonMaterial;
         [SerializeField] private Color glowColor = new Color(0.4f, 0.8f, 1f);
         private GameObject fairy;
         private Material glowMaterial;
@@ -18,6 +21,16 @@ namespace TurtleGame
         private Light glow;
         private Vector3 basePosition;
         private int waypoint;
+        private MoonGuidePath navigation;
+        private readonly List<Vector2> detour = new List<Vector2>();
+        private int detourPoint;
+        private float refreshTimer;
+        private bool routeComplete;
+        private Vector2 travelDirection;
+        private float retryTimer;
+
+        public Material MoonMaterial { get => moonMaterial; set => moonMaterial = value; }
+
         // Side steps take the guide around the three fixed route obstacles.
         private static readonly Vector2[] Route =
         {
@@ -41,17 +54,47 @@ namespace TurtleGame
 
             ConfigureMoonlight();
             waypoint = 0;
+            routeComplete = false;
+            travelDirection = Vector2.zero;
+            retryTimer = 0f;
+            detour.Clear();
+            detourPoint = 0;
+            refreshTimer = 0f;
+            float playerRadius = target.TryGetComponent<CharacterController>(out var character)
+                ? character.radius * Mathf.Max(target.lossyScale.x, target.lossyScale.z) + 0.2f : 0.65f;
+            navigation = new MoonGuidePath(beach, target, Mathf.Max(obstacleClearance, playerRadius));
+            navigation.Refresh(gameObject.scene);
             basePosition = PositionAt(Route[0]);
+            // Recover gracefully if the first waypoint was covered while editing the beach.
+            if (!navigation.IsPointClear(Route[0]))
+            {
+                Vector2 start = new Vector2(target.position.x, target.position.z);
+                if (!navigation.TryBuild(start, Route[0], detour))
+                    return;
+                basePosition = PositionAt(start);
+            }
             fairy = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             fairy.name = "Guiding moon";
-            Destroy(fairy.GetComponent<Collider>());
+            var sphere = fairy.GetComponent<Collider>();
+            sphere.enabled = false;
+            Destroy(sphere);
             fairy.transform.localScale = Vector3.one * 0.4f;
             fairy.transform.position = basePosition;
-            glowMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            glowMaterial.color = glowColor;
-            glowMaterial.EnableKeyword("_EMISSION");
-            glowMaterial.SetColor("_EmissionColor", glowColor * 1.5f);
-            fairy.GetComponent<Renderer>().sharedMaterial = glowMaterial;
+            var moonRenderer = fairy.GetComponent<Renderer>();
+            if (moonMaterial != null)
+            {
+                moonRenderer.sharedMaterial = moonMaterial;
+            }
+            else
+            {
+                glowMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                glowMaterial.color = glowColor;
+                glowMaterial.EnableKeyword("_EMISSION");
+                glowMaterial.SetColor("_EmissionColor", glowColor * 1.5f);
+                moonRenderer.sharedMaterial = glowMaterial;
+            }
+            moonRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            moonRenderer.receiveShadows = false;
             glow = fairy.AddComponent<Light>();
             glow.type = LightType.Point;
             glow.color = glowColor;
@@ -123,17 +166,63 @@ namespace TurtleGame
 
         private void Update()
         {
+            Advance(Time.deltaTime, Time.time);
+        }
+
+        private void Advance(float deltaTime, float time)
+        {
             if (fairy == null || target == null)
                 return;
-            Vector2 separation = new Vector2(basePosition.x - target.position.x, basePosition.z - target.position.z);
-            if (separation.magnitude < waitDistance)
+            if (deltaTime <= 0f)
+                return;
+            refreshTimer -= deltaTime;
+            retryTimer -= deltaTime;
+            if (refreshTimer <= 0f)
             {
-                Vector3 next = PositionAt(Route[waypoint]);
-                basePosition = Vector3.MoveTowards(basePosition, next, speed * Time.deltaTime);
-                if (Vector3.Distance(basePosition, next) < 0.05f && waypoint < Route.Length - 1)
-                    waypoint++;
+                navigation.Refresh(gameObject.scene);
+                refreshTimer = 0.75f;
+                if (detourPoint < detour.Count && !navigation.IsSegmentClear(
+                    new Vector2(basePosition.x, basePosition.z), detour[detourPoint]))
+                    detour.Clear();
             }
-            float time = Time.time;
+            Vector2 separation = new Vector2(basePosition.x - target.position.x, basePosition.z - target.position.z);
+            if (!routeComplete && separation.magnitude < waitDistance)
+            {
+                Vector2 position = new Vector2(basePosition.x, basePosition.z);
+                if (detour.Count == 0 && retryTimer <= 0f)
+                {
+                    detourPoint = 0;
+                    if (!navigation.TryBuild(position, Route[waypoint], detour))
+                        retryTimer = 0.75f;
+                }
+                if (detourPoint < detour.Count)
+                {
+                    // Move on a smoothed, visible segment, never through a rock to cut a corner.
+                    while (detourPoint + 1 < detour.Count &&
+                        navigation.IsSegmentClear(position, detour[detourPoint + 1]))
+                        detourPoint++;
+                    Vector2 direction = (detour[detourPoint] - position).normalized;
+                    travelDirection = Vector2.Lerp(travelDirection, direction,
+                        1f - Mathf.Exp(-6f * deltaTime)).normalized;
+                    float step = Mathf.Min(speed * deltaTime, Vector2.Distance(position, detour[detourPoint]));
+                    Vector2 next = position + travelDirection * step;
+                    if (step < speed * deltaTime || !navigation.IsSegmentClear(position, next) ||
+                        !navigation.IsSegmentClear(next, detour[detourPoint]))
+                        next = Vector2.MoveTowards(position, detour[detourPoint], speed * deltaTime);
+                    if (navigation.IsSegmentClear(position, next))
+                        basePosition = PositionAt(next);
+                    if (Vector2.Distance(next, detour[detourPoint]) < 0.001f)
+                    {
+                        detourPoint++;
+                        if (detourPoint == detour.Count)
+                        {
+                            detour.Clear();
+                            if (waypoint < Route.Length - 1) waypoint++;
+                            else routeComplete = true;
+                        }
+                    }
+                }
+            }
             fairy.transform.position = basePosition + new Vector3(Mathf.Sin(time * 1.7f) * 0.16f,
                 Mathf.Sin(time * 2.8f) * 0.12f, 0f);
             glow.intensity = 0.35f + Mathf.Sin(time * 1.5f) * 0.02f;
