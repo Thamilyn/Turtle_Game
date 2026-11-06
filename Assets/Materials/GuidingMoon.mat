@@ -29,13 +29,15 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Brightness: 2.2
+    - _Brightness: 2.8
     - _ShadowBrightness: 0.35
-    - _RimStrength: 0.18
+    - _RimStrength: 0.5
     - _RimPower: 4
+    - _HaloStrength: 0.65
     m_Colors:
     - _BaseColor: {r: 0.88, g: 0.94, b: 1, a: 1}
     - _LightDirection: {r: -0.45, g: 0.6, b: 1, a: 0}
     - _RimColor: {r: 0.55, g: 0.75, b: 1, a: 1}
+    - _HaloColor: {r: 0.35, g: 0.6, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

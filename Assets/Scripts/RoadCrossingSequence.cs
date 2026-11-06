@@ -15,6 +15,7 @@ namespace TurtleGame
         [SerializeField] private Transform car;
         [SerializeField] private Transform[] wheels;
         [SerializeField] private AudioSource engine;
+        [SerializeField] private BeachMusic beachMusic;
         [SerializeField] private Camera viewingCamera;
         [SerializeField] private Image screenOverlay;
         [SerializeField] private string endingScene = "Ending_Scene";
@@ -84,6 +85,8 @@ namespace TurtleGame
                 return;
             }
             HasStarted = true;
+            if (beachMusic != null)
+                beachMusic.StopMusic();
             playerWasEnabled = player.enabled;
             player.enabled = false;
             pauseMenus = FindObjectsByType<global::PauseMenuManager>(FindObjectsSortMode.None);
@@ -185,6 +188,8 @@ namespace TurtleGame
             StopAllCoroutines();
             if (!HasStarted)
                 return;
+            if (beachMusic != null)
+                beachMusic.StopMusic();
             if (player != null)
                 player.enabled = playerWasEnabled;
             if (followCamera != null)

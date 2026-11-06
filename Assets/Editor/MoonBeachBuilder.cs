@@ -182,7 +182,14 @@ namespace TurtleGame.Editor
             texture.SetPixels(pixels);
             texture.Apply();
             AssetDatabase.CreateAsset(texture, Folder + "/" + name + "Texture.asset");
-            var layer = new TerrainLayer { diffuseTexture = texture, tileSize = new Vector2(5f, 5f), smoothness = 0.1f };
+            // The generated RGBA texture has opaque alpha; using it as smoothness makes sand mirror-like.
+            var layer = new TerrainLayer
+            {
+                diffuseTexture = texture,
+                tileSize = new Vector2(5f, 5f),
+                smoothness = 0.1f,
+                smoothnessSource = TerrainLayerSmoothnessSource.Constant
+            };
             AssetDatabase.CreateAsset(layer, Folder + "/" + name + ".terrainlayer");
             return layer;
         }

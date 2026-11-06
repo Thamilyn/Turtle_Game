@@ -14,8 +14,10 @@ namespace TurtleGame
         [SerializeField, Min(0.4f)] private float obstacleClearance = 0.65f;
         [SerializeField] private Material moonMaterial;
         [SerializeField] private Color glowColor = new Color(0.4f, 0.8f, 1f);
+        [SerializeField, Min(0f)] private float groundLightIntensity = 3.5f;
         private GameObject fairy;
         private Material glowMaterial;
+        private Material haloMaterial;
         private Material trailMaterial;
         private Terrain beach;
         private Light glow;
@@ -30,6 +32,7 @@ namespace TurtleGame
         private float retryTimer;
 
         public Material MoonMaterial { get => moonMaterial; set => moonMaterial = value; }
+        public bool HasReachedRoad => routeComplete;
 
         // Side steps take the guide around the three fixed route obstacles.
         private static readonly Vector2[] Route =
@@ -95,11 +98,12 @@ namespace TurtleGame
             }
             moonRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             moonRenderer.receiveShadows = false;
+            CreateHalo();
             glow = fairy.AddComponent<Light>();
             glow.type = LightType.Point;
             glow.color = glowColor;
             glow.range = 10f;
-            glow.intensity = 0.35f;
+            glow.intensity = groundLightIntensity;
             glow.shadows = LightShadows.Soft;
             glow.bounceIntensity = 0f;
             var trail = fairy.AddComponent<TrailRenderer>();
@@ -118,6 +122,33 @@ namespace TurtleGame
             trail.startColor = glowColor;
             trail.endColor = new Color(glowColor.r, glowColor.g, glowColor.b, 0f);
             trail.minVertexDistance = 0.03f;
+        }
+
+        private void CreateHalo()
+        {
+            if (moonMaterial == null || !moonMaterial.HasProperty("_HaloStrength"))
+                return;
+
+            var halo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            halo.name = "Moon glow halo";
+            halo.transform.SetParent(fairy.transform, false);
+            halo.transform.localScale = Vector3.one * 3f;
+            var collider = halo.GetComponent<Collider>();
+            collider.enabled = false;
+            Destroy(collider);
+
+            haloMaterial = new Material(moonMaterial);
+            haloMaterial.EnableKeyword("_MOON_HALO");
+            haloMaterial.SetOverrideTag("RenderType", "Transparent");
+            haloMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            haloMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            haloMaterial.SetFloat("_ZWrite", 0f);
+            haloMaterial.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            haloMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            var renderer = halo.GetComponent<Renderer>();
+            renderer.sharedMaterial = haloMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
         }
 
         // Apply at Play startup as well, so an already-open scene receives the lighting update.
@@ -225,13 +256,14 @@ namespace TurtleGame
             }
             fairy.transform.position = basePosition + new Vector3(Mathf.Sin(time * 1.7f) * 0.16f,
                 Mathf.Sin(time * 2.8f) * 0.12f, 0f);
-            glow.intensity = 0.35f + Mathf.Sin(time * 1.5f) * 0.02f;
+            glow.intensity = groundLightIntensity * (1f + Mathf.Sin(time * 1.5f) * 0.06f);
         }
 
         private void OnDisable()
         {
             if (fairy != null) Destroy(fairy);
             if (glowMaterial != null) Destroy(glowMaterial);
+            if (haloMaterial != null) Destroy(haloMaterial);
             if (trailMaterial != null) Destroy(trailMaterial);
         }
     }
