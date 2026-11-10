@@ -81,14 +81,7 @@ namespace TurtleGame
         {
             if (leaving || !group.interactable)
                 return;
-            Time.timeScale = 1f;
-            if (Application.isEditor)
-            {
-                Debug.Log("Ending menu: Quit closes the built game.", this);
-                return;
-            }
-            leaving = true;
-            Application.Quit();
+            GameExit.Quit();
         }
     }
 }

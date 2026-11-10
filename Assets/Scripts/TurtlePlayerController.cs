@@ -27,27 +27,67 @@ namespace TurtleGame
         private CharacterController controller;
         private Vector3 planarVelocity;
         private float verticalVelocity;
+        private bool automaticMovement;
+        private Vector2 automaticStartInput;
+        private Vector2 automaticTargetInput;
+        private float automaticBlendElapsed;
 
         public Transform Visual { get => visual; set => visual = value; }
         public bool ReadKeyboard { get; set; } = true;
         public bool IsGrounded => controller != null && controller.isGrounded;
         public float MoveSpeed => moveSpeed;
+        public float MovementSpeedMultiplier { get; set; } = 1f;
+        public bool AcceptsPlayerInput => isActiveAndEnabled && ReadKeyboard && !automaticMovement;
+        public Vector2 TouchMovement { get; set; }
 
         private void Awake()
         {
             controller = GetComponent<CharacterController>();
+            if (!TryGetComponent<MobileTouchControls>(out _))
+                gameObject.AddComponent<MobileTouchControls>();
+            if (!TryGetComponent<TurtleSandTrail>(out _))
+                gameObject.AddComponent<TurtleSandTrail>();
         }
 
         private void OnDisable()
         {
             planarVelocity = Vector3.zero;
             verticalVelocity = 0f;
+            automaticMovement = false;
+            TouchMovement = Vector2.zero;
         }
 
         private void Update()
         {
-            if (ReadKeyboard)
-                Move(ReadMovementInput(), Time.deltaTime);
+            if (automaticMovement)
+            {
+                if (Time.deltaTime <= 0f)
+                    return;
+                automaticBlendElapsed += Time.deltaTime;
+                float blend = Mathf.SmoothStep(0f, 1f, automaticBlendElapsed / 0.25f);
+                Move(Vector2.Lerp(automaticStartInput, automaticTargetInput, blend), Time.deltaTime);
+            }
+            else if (ReadKeyboard)
+            {
+                Vector2 keyboardInput = ReadMovementInput();
+                Move(TouchMovement.sqrMagnitude > 0f ? TouchMovement : keyboardInput, Time.deltaTime);
+            }
+        }
+
+        public void BeginAutomaticMovement(Vector2 input)
+        {
+            float speed = moveSpeed * Mathf.Clamp01(MovementSpeedMultiplier);
+            automaticStartInput = speed > 0.001f
+                ? Vector2.ClampMagnitude(new Vector2(planarVelocity.x, planarVelocity.z) / speed, 1f)
+                : Vector2.zero;
+            automaticTargetInput = Vector2.ClampMagnitude(input, 1f);
+            automaticBlendElapsed = 0f;
+            automaticMovement = true;
+        }
+
+        public void EndAutomaticMovement()
+        {
+            automaticMovement = false;
         }
 
         /// <summary>Useful for keyboard, future input sources, or automated play checks.</summary>
@@ -61,7 +101,7 @@ namespace TurtleGame
             Vector3 direction = new Vector3(input.x, 0f, input.y);
             float rate = input.sqrMagnitude > 0f ? acceleration : deceleration;
             planarVelocity = Vector3.MoveTowards(planarVelocity,
-                direction * moveSpeed, rate * deltaTime);
+                direction * moveSpeed * Mathf.Clamp01(MovementSpeedMultiplier), rate * deltaTime);
 
             if (controller.isGrounded && verticalVelocity < 0f)
                 verticalVelocity = -2f;

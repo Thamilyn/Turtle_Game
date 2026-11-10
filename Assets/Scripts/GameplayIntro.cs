@@ -1,6 +1,7 @@
 
 using System.Collections;
 using UnityEngine;
+using TurtleGame;
 
 public class GameplayIntroUI : MonoBehaviour
 {
@@ -15,6 +16,9 @@ public class GameplayIntroUI : MonoBehaviour
     [SerializeField] private float objectiveFadeIn = 1f;
     [SerializeField] private float objectiveDisplayTime = 5f;
     [SerializeField] private float objectiveFadeOut = 1f;
+
+    [Header("Hatching and Movement")]
+    [SerializeField] private TurtleHatchOnMove hatchSequence;
 
     private bool sequenceStarted;
 
@@ -35,13 +39,21 @@ public class GameplayIntroUI : MonoBehaviour
 
     private IEnumerator IntroSequence()
     {
-        // Show controls.
-        yield return Fade(controlsGroup, 0f, 1f, controlsFadeIn);
-        yield return new WaitForSeconds(controlsDisplayTime);
-        yield return Fade(controlsGroup, 1f, 0f, controlsFadeOut);
+        // Mobile players learn directly from the on-screen joystick.
+        if (!MobileTouchControls.UsesTouchControls)
+        {
+            yield return Fade(controlsGroup, 0f, 1f, controlsFadeIn);
+            yield return new WaitForSeconds(controlsDisplayTime);
+            yield return Fade(controlsGroup, 1f, 0f, controlsFadeOut);
+        }
 
-        // Then show the objective.
+        // Let the hatch finish before inviting the player to move.
+        while (hatchSequence != null && !hatchSequence.HasFinishedHatching)
+            yield return null;
+
         yield return Fade(objectiveGroup, 0f, 1f, objectiveFadeIn);
+        if (hatchSequence != null)
+            hatchSequence.AllowWalking();
         yield return new WaitForSeconds(objectiveDisplayTime);
         yield return Fade(objectiveGroup, 1f, 0f, objectiveFadeOut);
     }

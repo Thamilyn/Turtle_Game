@@ -13,24 +13,24 @@ namespace TurtleGame.Editor
     public static class PastelBlueCelSetup
     {
         private const string MaterialPath = "Assets/Materials/PastelBlueCel.mat";
-        private const string FeatureName = "Pastel Blue Cel";
+        private const string FeatureName = "Cozy World Style";
         private static readonly string[] RendererPaths =
         {
             "Assets/Settings/PC_Renderer.asset",
             "Assets/Settings/Mobile_Renderer.asset"
         };
 
-        [MenuItem("Turtle Game/Estilo azul pastel/Instalar o actualizar")]
+        [MenuItem("Turtle Game/Estilo cozy global/Instalar o actualizar")]
         public static void Install()
         {
-            var shader = Shader.Find("TurtleGame/Pastel Blue Cel");
+            var shader = Shader.Find("TurtleGame/Cozy World Style");
             if (shader == null)
-                throw new InvalidOperationException("Pastel Blue Cel shader could not be imported.");
+                throw new InvalidOperationException("Cozy World Style shader could not be imported.");
 
             var material = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
             if (material == null)
             {
-                material = new Material(shader) { name = "PastelBlueCel" };
+                material = new Material(shader) { name = "CozyWorldStyle" };
                 AssetDatabase.CreateAsset(material, MaterialPath);
             }
 
@@ -41,18 +41,19 @@ namespace TurtleGame.Editor
                     throw new InvalidOperationException("Missing URP renderer: " + path);
 
                 var feature = renderer.rendererFeatures.OfType<FullScreenPassRendererFeature>()
-                    .FirstOrDefault(candidate => candidate.name == FeatureName);
+                    .FirstOrDefault(candidate => candidate.name == FeatureName || candidate.name == "Pastel Blue Cel" || candidate.name == "Cozy Anime Cel" || candidate.name == "Soft Cozy Cel");
                 if (feature == null)
                 {
                     feature = ScriptableObject.CreateInstance<FullScreenPassRendererFeature>();
                     feature.name = FeatureName;
-                    Undo.RegisterCreatedObjectUndo(feature, "Install pastel blue cel style");
+                    Undo.RegisterCreatedObjectUndo(feature, "Install cozy anime cel style");
                     AssetDatabase.AddObjectToAsset(feature, renderer);
-                    Undo.RecordObject(renderer, "Install pastel blue cel style");
+                    Undo.RecordObject(renderer, "Install cozy anime cel style");
                     renderer.rendererFeatures.Add(feature);
                 }
 
-                Undo.RecordObject(feature, "Configure pastel blue cel style");
+                Undo.RecordObject(feature, "Configure cozy anime cel style");
+                feature.name = FeatureName;
                 feature.passMaterial = material;
                 feature.injectionPoint = FullScreenPassRendererFeature.InjectionPoint.AfterRenderingPostProcessing;
                 feature.fetchColorBuffer = true;
@@ -78,14 +79,14 @@ namespace TurtleGame.Editor
 
             AssetDatabase.SaveAssets();
             SceneView.RepaintAll();
-            Debug.Log("Pastel Blue Cel installed on PC and Mobile. Adjust Assets/Materials/PastelBlueCel.mat.");
+            Debug.Log("Cozy World Style installed on PC and Mobile. Adjust Assets/Materials/PastelBlueCel.mat.");
         }
 
-        [MenuItem("Turtle Game/Estilo azul pastel/Verificar y capturar")]
+        [MenuItem("Turtle Game/Estilo cozy global/Verificar y capturar")]
         public static void VerifyAndCapture()
         {
             if (EditorApplication.isPlaying)
-                throw new InvalidOperationException("Run pastel verification outside Play Mode.");
+                throw new InvalidOperationException("Run cozy cel verification outside Play Mode.");
             if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
 
@@ -131,11 +132,12 @@ namespace TurtleGame.Editor
                     {
                         feature.SetActive(false);
                         renderer.SetDirty();
-                        Color32[] before = Capture(camera, "Logs/pastel-blue-" + platform + "-before.png");
+                        Color32[] before = Capture(camera, "Logs/cozy-anime-" + platform + "-before.png");
                         feature.SetActive(true);
                         renderer.SetDirty();
-                        Color32[] after = Capture(camera, "Logs/pastel-blue-" + platform + "-after.png");
+                        Color32[] after = Capture(camera, "Logs/cozy-anime-" + platform + "-after.png");
                         VerifyPixels(before, after, platform);
+                        VerifySky(camera, renderer, feature, platform);
                     }
                     finally
                     {
@@ -148,15 +150,46 @@ namespace TurtleGame.Editor
                     .Where(message => message.severity == UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error).ToArray();
                 if (errors.Length != 0)
                     throw new InvalidOperationException(string.Join("\n", errors.Select(message => message.message)));
-                File.WriteAllText("Logs/pastel-blue-verification-result.txt",
-                    "PASS: shader compilation; PC and Mobile render captures; blue palette; visible effect; idempotent installation.\n");
-                Debug.Log("PASTEL_BLUE_CEL_VERIFICATION_PASS");
+                File.WriteAllText("Logs/cozy-anime-verification-result.txt",
+                    "PASS: shader compilation; PC and Mobile render captures; preserved tones; unchanged sky; visible effect; idempotent installation.\n");
+                Debug.Log("COZY_ANIME_CEL_VERIFICATION_PASS");
             }
             finally
             {
                 QualitySettings.renderPipeline = previousPipeline;
                 ShaderUtil.allowAsyncCompilation = asyncCompilation;
                 EditorSceneManager.RestoreSceneManagerSetup(previousScenes);
+            }
+        }
+
+        private static void VerifySky(Camera camera, UniversalRendererData renderer,
+            FullScreenPassRendererFeature feature, string platform)
+        {
+            int previousMask = camera.cullingMask;
+            try
+            {
+                // Render the actual skybox without geometry, so all pixels must
+                // bypass the effect regardless of the palette settings.
+                camera.cullingMask = 0;
+                feature.SetActive(false);
+                renderer.SetDirty();
+                Color32[] before = Capture(camera, "Logs/cozy-sky-" + platform + "-before.png");
+                feature.SetActive(true);
+                renderer.SetDirty();
+                Color32[] after = Capture(camera, "Logs/cozy-sky-" + platform + "-after.png");
+                for (int i = 0; i < before.Length; i++)
+                {
+                    if (Math.Abs(before[i].r - after[i].r) > 1 ||
+                        Math.Abs(before[i].g - after[i].g) > 1 ||
+                        Math.Abs(before[i].b - after[i].b) > 1)
+                        throw new InvalidOperationException(platform + " sky was altered by the world style.");
+                }
+            }
+            finally
+            {
+                camera.cullingMask = previousMask;
+                feature.SetActive(true);
+                renderer.SetDirty();
             }
         }
 
@@ -195,21 +228,23 @@ namespace TurtleGame.Editor
         private static void VerifyPixels(Color32[] before, Color32[] after, string platform)
         {
             int changed = 0;
-            int blue = 0;
+            long totalDifference = 0;
             int magenta = 0;
             foreach (var pair in before.Zip(after, (a, b) => (before: a, after: b)))
             {
-                if (Math.Abs(pair.before.r - pair.after.r) + Math.Abs(pair.before.g - pair.after.g) +
-                    Math.Abs(pair.before.b - pair.after.b) > 12)
+                int difference = Math.Abs(pair.before.r - pair.after.r) + Math.Abs(pair.before.g - pair.after.g) +
+                    Math.Abs(pair.before.b - pair.after.b);
+                totalDifference += difference;
+                if (difference > 2)
                     changed++;
-                if (pair.after.b > pair.after.r && pair.after.b >= pair.after.g)
-                    blue++;
                 if (pair.after.r > 240 && pair.after.g < 15 && pair.after.b > 240)
                     magenta++;
             }
-            if (changed < after.Length * 0.5f || blue < after.Length * 0.8f || magenta > after.Length * 0.01f)
-                throw new InvalidOperationException($"{platform} render failed: changed={changed}, blue={blue}, magenta={magenta}.");
-            Debug.Log($"PASTEL_BLUE_{platform}: changed={changed}, blue={blue}, magenta={magenta}.");
+            // A soft treatment must be visible without replacing the scene's tones.
+            float meanDifference = totalDifference / (after.Length * 3f);
+            if (changed < after.Length * 0.02f || meanDifference > 12f || magenta > after.Length * 0.01f)
+                throw new InvalidOperationException($"{platform} render failed: changed={changed}, meanDifference={meanDifference}, magenta={magenta}.");
+            Debug.Log($"COZY_ANIME_{platform}: changed={changed}, meanDifference={meanDifference}, magenta={magenta}.");
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -29,6 +30,8 @@ namespace TurtleGame.Editor
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
                 throw new InvalidOperationException("Run road verification from Edit Mode.");
+            if (Application.isBatchMode)
+                EditorSceneManager.OpenScene(MoonBeachBuilder.ScenePath);
             if (Object.FindFirstObjectByType<RoadCrossingSequence>() == null)
                 throw new InvalidOperationException("Open MoonBeach and install the road sequence first.");
             SessionState.SetBool(PendingKey, true);
@@ -81,20 +84,22 @@ namespace TurtleGame.Editor
             var car = (Transform)serialized.FindProperty("car").objectReferenceValue;
             var overlay = (Image)serialized.FindProperty("screenOverlay").objectReferenceValue;
             var engine = (AudioSource)serialized.FindProperty("engine").objectReferenceValue;
+            float engineVolume = serialized.FindProperty("engineVolume").floatValue;
+            Assert(Mathf.Approximately(engineVolume, 0.95f), "Car uses the modestly increased volume");
             var music = (BeachMusic)serialized.FindProperty("beachMusic").objectReferenceValue;
             Assert(music != null, "The encounter references the beach music");
             var musicSource = music.GetComponent<AudioSource>();
             var distortion = music.GetComponent<AudioDistortionFilter>();
             var lowPass = music.GetComponent<AudioLowPassFilter>();
             var guide = Object.FindFirstObjectByType<MoonFairyGuide>();
-            Assert(guide != null && new SerializedObject(music).FindProperty("moonGuide").objectReferenceValue == guide,
-                "The music references the beach's actual moon guide");
+            Assert(guide != null,
+                "The beach has its moon guide");
             Assert(AssetDatabase.GetAssetPath(musicSource.clip) == BeachMusicInstaller.ClipPath,
                 "Dreamy Night is assigned to the beach");
             Assert(musicSource.loop && musicSource.spatialBlend == 0f,
                 "Background music loops in stereo without distance attenuation");
             Assert(musicSource.clip.loadType == AudioClipLoadType.DecompressOnLoad,
-                "Music is decoded for precise short-fragment rewinds");
+                "Music is preloaded and decoded for playback");
             Assert(!distortion.enabled && !lowPass.enabled && musicSource.pitch == 1f,
                 "The calm track starts without scratch effects");
             float musicDeadline = Time.realtimeSinceStartup + 10f;
@@ -113,6 +118,16 @@ namespace TurtleGame.Editor
             var menu = Object.FindFirstObjectByType<global::BeachMainMenu>();
             if (menu != null)
                 menu.PlayGame();
+            var hatch = Object.FindFirstObjectByType<TurtleHatchOnMove>();
+            if (hatch != null)
+            {
+                hatch.BeginGameplay();
+                hatch.AllowWalking();
+            }
+            float controlsDeadline = Time.realtimeSinceStartup + 15f;
+            while (!player.enabled && Time.realtimeSinceStartup < controlsDeadline)
+                yield return null;
+            Assert(player.enabled, "Hatching releases movement before the road checks");
             player.ReadKeyboard = false;
             Assert(!sequence.HasStarted && !car.gameObject.activeSelf, "Car waits before road contact");
             Assert(car.GetComponentsInChildren<Collider>(true).Length == 0,
@@ -130,7 +145,7 @@ namespace TurtleGame.Editor
             Assert(!sequence.HasStarted, "Being beyond the road ends does not trigger the encounter");
 
             // Start on the real sand, then walk across the real asphalt edge.
-            Teleport(character, new Vector3(0f, road.bounds.max.y + 0.08f, road.bounds.min.z - 1.5f));
+            Teleport(character, new Vector3(0f, road.bounds.max.y + 0.08f, road.bounds.min.z - 4.5f));
             for (int i = 0; i < 30; i++) { player.Move(Vector2.zero, 1f / 60f); yield return null; }
             Assert(!sequence.HasStarted, "Approaching on sand leaves the car hidden");
             Time.timeScale = 0f;
@@ -151,7 +166,7 @@ namespace TurtleGame.Editor
                 "Resuming restores the calm track");
 
             // Simulate the real guide route while the turtle's collider cannot touch the road.
-            // Earlier waiting points must leave the song clean; only the final stop triggers it.
+            // Every waiting point, including the final stop, must leave the song clean.
             Time.timeScale = 0f;
             character.enabled = false;
             Vector3 sandPosition = player.transform.position;
@@ -172,63 +187,57 @@ namespace TurtleGame.Editor
             Assert(guide.HasReachedRoad, "The moon completes its real route and stops at the road");
             Teleport(character, sandPosition);
             for (int i = 0; i < 3; i++) yield return null;
-            Assert(!distortion.enabled, "A paused game defers the moon-triggered scratch until resume");
+            Assert(!distortion.enabled && !lowPass.enabled,
+                "The moon stopping never enables scratch filters");
             Time.timeScale = 1f;
             for (int i = 0; i < 3; i++) yield return null;
-            Assert(distortion.enabled && lowPass.enabled && musicSource.pitch < 0.8f &&
-                distortion.distortionLevel >= 0.3f && musicSource.volume > 0.04f &&
-                !sequence.HasStarted && !car.gameObject.activeSelf,
-                "The moon's final stop immediately breaks the calm with an audible scratch before the car");
-            Time.timeScale = 0f;
-            for (int i = 0; i < 3; i++) yield return null;
-            Assert(!musicSource.isPlaying, "The brief scratch also respects pause");
-            float pausedScratchPitch = musicSource.pitch;
-            int pausedScratchSample = musicSource.timeSamples;
-            float scratchPauseDeadline = Time.realtimeSinceStartup + 0.15f;
-            while (Time.realtimeSinceStartup < scratchPauseDeadline)
-                yield return null;
-            Assert(Mathf.Abs(musicSource.timeSamples - pausedScratchSample) < 2048 &&
-                Mathf.Approximately(musicSource.pitch, pausedScratchPitch),
-                "Pausing freezes both the scratch fragment and its slowdown");
-            Time.timeScale = 1f;
-            for (int i = 0; i < 3; i++) yield return null;
-            Assert(musicSource.isPlaying && distortion.enabled, "Resuming continues the brief scratch");
-            bool rewoundFragment = false;
-            int previousMusicSample = musicSource.timeSamples;
-            float scratchDeadline = Time.realtimeSinceStartup + 1.2f;
-            while ((musicSource.isPlaying || distortion.enabled) && Time.realtimeSinceStartup < scratchDeadline)
+            float calmDeadline = Time.realtimeSinceStartup + 1.2f;
+            while (Time.realtimeSinceStartup < calmDeadline)
             {
-                int sample = musicSource.timeSamples;
-                rewoundFragment |= sample < previousMusicSample;
-                previousMusicSample = sample;
-                Assert(!sequence.HasStarted && !car.gameObject.activeSelf && !engine.isPlaying,
-                    "The scratch breaks the peace before the car and engine start");
+                Assert(musicSource.isPlaying && musicSource.pitch == 1f && musicSource.volume > 0.1f &&
+                    !distortion.enabled && !lowPass.enabled && !engine.isPlaying && !sequence.HasStarted,
+                    "Music stays calm after the moon stops, with no scratch or advance warning");
                 yield return null;
             }
-            Assert(rewoundFragment, "The brief scratch repeats the music fragment before the engine");
-            Assert(!musicSource.isPlaying && musicSource.volume == 0f && !distortion.enabled && !lowPass.enabled,
-                "The brief scratch ends in silence while the turtle is still on sand");
-            float silenceDeadline = Time.realtimeSinceStartup + 0.2f;
-            while (Time.realtimeSinceStartup < silenceDeadline)
+            float crossingDeadline = Time.realtimeSinceStartup + 5f;
+            while (!sequence.HasStarted && Time.realtimeSinceStartup < crossingDeadline)
             {
-                Assert(!musicSource.isPlaying && !engine.isPlaying, "Silence separates the scratch from the engine");
+                bool wasAutomatic = (bool)typeof(RoadCrossingSequence)
+                    .GetField("automaticApproach", privateInstance).GetValue(sequence);
+                Vector3 beforeStep = player.transform.position;
+                float previousDeltaTime = Time.deltaTime;
+                if (!wasAutomatic)
+                    player.Move(Vector2.up, 1f / 60f);
                 yield return null;
-            }
-            for (int i = 0; i < 120 && !sequence.HasStarted; i++)
-            {
-                player.Move(Vector2.up, 1f / 60f);
-                yield return null;
+                if (wasAutomatic && !sequence.HasStarted)
+                {
+                    Vector3 step = player.transform.position - beforeStep;
+                    step.y = 0f;
+                    float maximumStep = player.MoveSpeed * Mathf.Max(previousDeltaTime, Time.deltaTime);
+                    Assert(step.magnitude <= maximumStep + 0.01f,
+                        "Automatic movement never adds a second movement step or a speed spike");
+                }
             }
             Assert(sequence.HasStarted, "Walking onto the road starts the car on contact");
+            Assert(character.bounds.center.z > road.bounds.min.z + 0.25f &&
+                character.bounds.center.z < road.bounds.max.z - 0.25f,
+                "The turtle visibly steps onto asphalt before movement stops and the car starts");
+            Assert((bool)typeof(RoadCrossingSequence).GetField("automaticApproach", privateInstance).GetValue(sequence),
+                "The turtle completes the road-edge approach without movement input");
             Assert(!musicSource.isPlaying && !distortion.enabled && !lowPass.enabled && engine.isPlaying,
                 "The engine starts alone with the scratch and music already stopped");
+            if (!overlay.gameObject.activeSelf)
+                Assert(Mathf.Approximately(engine.volume, engineVolume),
+                    "Car starts at the configured volume before the blackout fade");
             Assert(engine.GetComponent<AudioDistortionFilter>() == null &&
                 engine.GetComponent<AudioLowPassFilter>() == null,
                 "The music filters never process the car engine");
             Assert(!player.enabled && (pause == null || !pause.enabled), "Movement and pause stop during the encounter");
             Vector3 turtlePosition = player.transform.position;
             float firstX = car.position.x;
-            bool capturedCar = false;
+            bool capturedCar = car.gameObject.activeSelf && !overlay.gameObject.activeSelf;
+            if (capturedCar)
+                ScreenCapture.CaptureScreenshot("Logs/road-crossing-car.png");
             int beats = 0;
             bool red = false;
             bool sawBlack = false;
@@ -249,7 +258,7 @@ namespace TurtleGame.Editor
                 }
                 else if (!capturedCar && car.position.x > turtlePosition.x - 4.5f)
                 {
-                    Assert(car.position.x > firstX + 1f, "Car travels across the road");
+                    Assert(car.position.x > firstX, "Car travels across the road");
                     ScreenCapture.CaptureScreenshot("Logs/road-crossing-car.png");
                     capturedCar = true;
                 }

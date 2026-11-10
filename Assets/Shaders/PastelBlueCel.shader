@@ -1,78 +1,60 @@
-Shader "TurtleGame/Pastel Blue Cel"
+Shader "TurtleGame/Cozy World Style"
 {
     Properties
     {
-        _Strength ("Effect Strength", Range(0, 1)) = 1
-        _ShadowColor ("Blue Shadows", Color) = (0.32, 0.46, 0.68, 1)
-        _MidColor ("Pastel Blue", Color) = (0.58, 0.75, 0.9, 1)
-        _LightColor ("Ice Blue Highlights", Color) = (0.88, 0.95, 1, 1)
-        _Exposure ("Brightness", Range(0.25, 4)) = 1.65
-        _Bands ("Cel Bands", Range(2, 8)) = 4
-        _BandSoftness ("Band Softness", Range(0.01, 0.49)) = 0.16
-        _OriginalColor ("Original Color Detail", Range(0, 1)) = 0.08
-        _OutlineColor ("Blue Outline", Color) = (0.23, 0.35, 0.55, 1)
-        _OutlineStrength ("Outline Strength", Range(0, 1)) = 0.45
-        _OutlineWidth ("Outline Width (Pixels)", Range(0.5, 3)) = 1
-        _OutlineThreshold ("Outline Depth Threshold", Range(0.005, 0.2)) = 0.035
+        _Strength ("World Style Strength", Range(0, 1)) = 0.85
+        _CelStrength ("Soft Cel Shading", Range(0, 1)) = 0.35
+        _Bands ("Light Bands", Range(3, 10)) = 5
+        _BandSoftness ("Band Transition", Range(0.05, 0.49)) = 0.24
+        _Saturation ("Shared Saturation", Range(0, 1.5)) = 0.78
+        _PaletteStrength ("Palette Harmony", Range(0, 1)) = 0.38
+        _TextureSoftness ("Texture Softness", Range(0, 1)) = 0.28
+        _ShadowTint ("Lavender Shadows", Color) = (0.82, 0.83, 1, 1)
+        _MidTint ("Peach Midtones", Color) = (1, 0.94, 0.88, 1)
+        _HighlightTint ("Cream Highlights", Color) = (1, 0.97, 0.86, 1)
     }
-
     SubShader
     {
         Tags { "RenderPipeline" = "UniversalPipeline" }
         ZWrite Off
         ZTest Always
         Cull Off
-
         Pass
         {
-            Name "Pastel Blue Cel"
-
+            Name "Cozy World Style"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma target 3.5
-
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
-                half4 _ShadowColor;
-                half4 _MidColor;
-                half4 _LightColor;
-                half4 _OutlineColor;
                 float _Strength;
-                float _Exposure;
+                float _CelStrength;
                 float _Bands;
                 float _BandSoftness;
-                float _OriginalColor;
-                float _OutlineStrength;
-                float _OutlineWidth;
-                float _OutlineThreshold;
+                float _Saturation;
+                float _PaletteStrength;
+                float _TextureSoftness;
+                half4 _ShadowTint;
+                half4 _MidTint;
+                half4 _HighlightTint;
             CBUFFER_END
 
-            // Work in perceptual color so the bands stay readable in the night scene.
-            half3 ToPerceptual(half3 color)
+            half3 Perceptual(half3 color)
             {
-                #if defined(UNITY_COLORSPACE_GAMMA)
-                    return saturate(color);
+                #if !defined(UNITY_COLORSPACE_GAMMA)
+                    return LinearToSRGB(max(color, 0.0));
                 #else
-                    return LinearToSRGB(saturate(color));
+                    return max(color, 0.0);
                 #endif
             }
 
-            half3 FromPerceptual(half3 color)
+            // Smooth small texture variations without mixing across silhouettes.
+            float SceneDistance(float depth)
             {
-                #if defined(UNITY_COLORSPACE_GAMMA)
-                    return color;
-                #else
-                    return SRGBToLinear(color);
-                #endif
-            }
-
-            float EyeDepth(float2 uv)
-            {
-                float depth = SampleSceneDepth(saturate(uv));
                 if (unity_OrthoParams.w > 0.5)
                 {
                     #if UNITY_REVERSED_Z
@@ -83,50 +65,76 @@ Shader "TurtleGame/Pastel Blue Cel"
                 return LinearEyeDepth(depth, _ZBufferParams);
             }
 
+            void AccumulateNeighbor(float2 uv, float depth, half3 center,
+                inout half3 sum, inout float totalWeight)
+            {
+                float neighborDepth = SampleSceneDepth(uv);
+                float centerEye = SceneDistance(depth);
+                float neighborEye = SceneDistance(neighborDepth);
+                float depthWeight = saturate(1.0 - abs(centerEye - neighborEye) / max(centerEye * 0.01, 0.00001));
+                half3 sampleColor = Perceptual(SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv).rgb);
+                float colorDistance = length(sampleColor - center);
+                float weight = depthWeight * exp2(-colorDistance * colorDistance * 160.0);
+                sum += sampleColor * weight;
+                totalWeight += weight;
+            }
+
             half4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv = input.texcoord;
                 half4 source = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv);
-                // Keep the night sky and its small HDR stars out of the pastel palette.
-                float rawDepth = SampleSceneDepth(uv);
+                float depth = SampleSceneDepth(uv);
                 #if UNITY_REVERSED_Z
-                    if (rawDepth <= 0.000001)
-                        return source;
+                    if (depth <= 0.000001) return source;
                 #else
-                    if (rawDepth >= 0.999999)
-                        return source;
+                    if (depth >= 0.999999) return source;
                 #endif
-                half3 original = ToPerceptual(source.rgb);
-                float luminance = saturate(dot(original, half3(0.2126, 0.7152, 0.0722)) * _Exposure);
 
-                float intervals = max(round(_Bands) - 1.0, 1.0);
-                float scaled = luminance * intervals;
-                float softness = max(_BandSoftness, fwidth(scaled));
-                float band = (floor(scaled) + smoothstep(0.5 - softness, 0.5 + softness, frac(scaled))) / intervals;
-                half3 shadow = ToPerceptual(_ShadowColor.rgb);
-                half3 middle = ToPerceptual(_MidColor.rgb);
-                half3 highlight = ToPerceptual(_LightColor.rgb);
-                half3 pastel = band < 0.5
-                    ? lerp(shadow, middle, band * 2.0)
-                    : lerp(middle, highlight, band * 2.0 - 1.0);
+                // No geometry in depth means sky: return it byte-for-byte unchanged.
+                // Use the source texture dimensions so render scale is respected.
+                half3 color = Perceptual(source.rgb);
+                half3 sum = color;
+                float totalWeight = 1.0;
+                float2 texel = _BlitTexture_TexelSize.xy;
+                AccumulateNeighbor(saturate(uv + float2(texel.x, 0)), depth, color, sum, totalWeight);
+                AccumulateNeighbor(saturate(uv - float2(texel.x, 0)), depth, color, sum, totalWeight);
+                AccumulateNeighbor(saturate(uv + float2(0, texel.y)), depth, color, sum, totalWeight);
+                AccumulateNeighbor(saturate(uv - float2(0, texel.y)), depth, color, sum, totalWeight);
+                color = lerp(color, sum / totalWeight, _TextureSoftness);
+                float luminance = dot(color, float3(0.2126, 0.7152, 0.0722));
+                float brightness = saturate(luminance);
+                float intervals = max(round(_Bands) - 1.0, 2.0);
+                float scaled = brightness * intervals;
+                float softness = min(0.49, max(_BandSoftness, fwidth(scaled)));
+                float stepped = (floor(scaled) + smoothstep(0.5 - softness,
+                    0.5 + softness, frac(scaled))) / intervals;
 
-                // Retain a little texture variation while keeping a shared blue palette.
-                pastel = lerp(pastel, original, _OriginalColor);
-
-                float2 texel = _OutlineWidth / _ScaledScreenParams.xy;
-                float center = EyeDepth(uv);
-                float left = EyeDepth(uv - float2(texel.x, 0));
-                float right = EyeDepth(uv + float2(texel.x, 0));
-                float down = EyeDepth(uv - float2(0, texel.y));
-                float up = EyeDepth(uv + float2(0, texel.y));
-                // Second differences reject smooth ground slopes and keep silhouettes.
-                float curvature = max(abs(left + right - 2.0 * center), abs(down + up - 2.0 * center));
-                float edge = curvature / max(center, 0.1);
-                edge = smoothstep(_OutlineThreshold, _OutlineThreshold * 2.0, edge);
-                pastel = lerp(pastel, ToPerceptual(_OutlineColor.rgb), edge * _OutlineStrength);
-
-                return half4(lerp(source.rgb, FromPerceptual(pastel), _Strength), source.a);
+                // Bound the tonal change: never replace albedo with a flat palette.
+                // Fade out in deep shadows and specular highlights to prevent blotches.
+                float midtoneMask = smoothstep(0.04, 0.20, brightness)
+                    * (1.0 - smoothstep(0.72, 0.98, brightness));
+                float delta = clamp(stepped - brightness, -0.045, 0.045)
+                    * _CelStrength * midtoneMask;
+                float gain = 1.0 + delta / max(luminance, 0.12);
+                half3 styled = color * gain;
+                float styledLuminance = dot(styled, half3(0.2126, 0.7152, 0.0722));
+                styled = lerp(styledLuminance.xxx, styled, _Saturation);
+                // A shared split tone coordinates every material without replacing
+                // its albedo. Normalize the tint to preserve the scene's brightness.
+                half3 shadow = Perceptual(_ShadowTint.rgb);
+                half3 middle = Perceptual(_MidTint.rgb);
+                half3 highlight = Perceptual(_HighlightTint.rgb);
+                half3 tint = lerp(shadow, middle, smoothstep(0.08, 0.48, brightness));
+                tint = lerp(tint, highlight, smoothstep(0.48, 0.90, brightness));
+                tint /= max(dot(tint, half3(0.2126, 0.7152, 0.0722)), 0.01);
+                // Preserve emissive whites and bloom while harmonizing surfaces.
+                float paletteMask = 1.0 - smoothstep(0.9, 1.3, luminance);
+                styled *= lerp(half3(1, 1, 1), tint, _PaletteStrength * paletteMask);
+                #if !defined(UNITY_COLORSPACE_GAMMA)
+                    styled = SRGBToLinear(max(styled, 0.0));
+                #endif
+                return half4(lerp(source.rgb, styled, _Strength), source.a);
             }
             ENDHLSL
         }

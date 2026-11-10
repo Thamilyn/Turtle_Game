@@ -4105,7 +4105,7 @@ MonoBehaviour:
   viewingCamera: {fileID: 1759717889}
   screenOverlay: {fileID: 1236597373}
   endingScene: Ending_Scene
-  approachDistance: 18
+  approachDistance: 2.2
   carSpeed: 22
   wheelRadius: 0.34
   cameraOffset: {x: 0, y: 3, z: -7}
@@ -15511,7 +15511,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 771ce407ce807b74885ec23ebd1e6647, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.8
+  m_Volume: 0.95
   m_Pitch: 1.2
   Loop: 1
   Mute: 0

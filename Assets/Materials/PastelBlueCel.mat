@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: PastelBlueCel
+  m_Name: CozyWorldStyle
   m_Shader: {fileID: 4800000, guid: 27d54873658ca8a42a0999fc183e374f, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -25,18 +25,16 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _BandSoftness: 0.16
-    - _Bands: 4
-    - _Exposure: 1.65
-    - _OriginalColor: 0.08
-    - _OutlineStrength: 0.45
-    - _OutlineThreshold: 0.035
-    - _OutlineWidth: 1
-    - _Strength: 0.12
+    - _Strength: 0.85
+    - _CelStrength: 0.35
+    - _Bands: 5
+    - _BandSoftness: 0.24
+    - _PaletteStrength: 0.38
+    - _Saturation: 0.78
+    - _TextureSoftness: 0.28
     m_Colors:
-    - _LightColor: {r: 0.88, g: 0.95, b: 1, a: 1}
-    - _MidColor: {r: 0.58, g: 0.75, b: 0.9, a: 1}
-    - _OutlineColor: {r: 0.22999996, g: 0.34999996, b: 0.54999995, a: 1}
-    - _ShadowColor: {r: 0.31999996, g: 0.45999992, b: 0.68, a: 1}
+    - _ShadowTint: {r: 0.82, g: 0.83, b: 1, a: 1}
+    - _MidTint: {r: 1, g: 0.94, b: 0.88, a: 1}
+    - _HighlightTint: {r: 1, g: 0.97, b: 0.86, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

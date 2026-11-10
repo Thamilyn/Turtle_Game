@@ -15,10 +15,16 @@ namespace TurtleGame
         [SerializeField] private Material moonMaterial;
         [SerializeField] private Color glowColor = new Color(0.4f, 0.8f, 1f);
         [SerializeField, Min(0f)] private float groundLightIntensity = 3.5f;
+        [Header("Luces de orientación")]
+        [SerializeField, Min(1f)] private float guidanceDistance = 6f;
+        [SerializeField, Min(1f)] private float guidanceDelay = 5f;
+        [Header("Progreso siguiendo a la luna")]
+        [SerializeField, Min(3f)] private float barrierSpacing = 12f;
+        private MoonProgressBarriers progressBarriers;
+        private MoonGuidanceParticles guidance;
         private GameObject fairy;
         private Material glowMaterial;
         private Material haloMaterial;
-        private Material trailMaterial;
         private Terrain beach;
         private Light glow;
         private Vector3 basePosition;
@@ -42,7 +48,7 @@ namespace TurtleGame
             new Vector2(0f, 49f), new Vector2(-3.5f, 59f),
             new Vector2(-3f, 68f), new Vector2(-7.8f, 85f),
             new Vector2(-5f, 94f), new Vector2(0f, 110f),
-            new Vector2(0f, 120f)
+            new Vector2(0f, 122f)
         };
 
         private void OnEnable()
@@ -106,22 +112,13 @@ namespace TurtleGame
             glow.intensity = groundLightIntensity;
             glow.shadows = LightShadows.Soft;
             glow.bounceIntensity = 0f;
-            var trail = fairy.AddComponent<TrailRenderer>();
-            trailMaterial = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
-            trailMaterial.SetFloat("_Surface", 1f);
-            trailMaterial.SetFloat("_Blend", 0f);
-            trailMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            trailMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            trailMaterial.SetFloat("_ZWrite", 0f);
-            trailMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            trailMaterial.renderQueue = 3000;
-            trail.sharedMaterial = trailMaterial;
-            trail.time = 0.8f;
-            trail.startWidth = 0.09f;
-            trail.endWidth = 0f;
-            trail.startColor = glowColor;
-            trail.endColor = new Color(glowColor.r, glowColor.g, glowColor.b, 0f);
-            trail.minVertexDistance = 0.03f;
+            Color guidanceColor = moonMaterial != null && moonMaterial.HasProperty("_HaloColor")
+                ? moonMaterial.GetColor("_HaloColor") : glowColor;
+            guidance = new MoonGuidanceParticles(fairy, beach, target, navigation, guidanceColor);
+            var barriers = new GameObject("Moon progress barriers");
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(barriers, gameObject.scene);
+            progressBarriers = barriers.AddComponent<MoonProgressBarriers>();
+            progressBarriers.Initialize(beach, basePosition.z, Route[Route.Length - 1], barrierSpacing);
         }
 
         private void CreateHalo()
@@ -257,14 +254,23 @@ namespace TurtleGame
             fairy.transform.position = basePosition + new Vector3(Mathf.Sin(time * 1.7f) * 0.16f,
                 Mathf.Sin(time * 2.8f) * 0.12f, 0f);
             glow.intensity = groundLightIntensity * (1f + Mathf.Sin(time * 1.5f) * 0.06f);
+            guidance.Advance(deltaTime, time, basePosition, guidanceDistance, guidanceDelay);
+            progressBarriers.ReleaseReached(basePosition.z);
         }
 
         private void OnDisable()
         {
+            guidance?.Dispose();
+            guidance = null;
+            if (progressBarriers != null)
+            {
+                progressBarriers.gameObject.SetActive(false);
+                Destroy(progressBarriers.gameObject);
+                progressBarriers = null;
+            }
             if (fairy != null) Destroy(fairy);
             if (glowMaterial != null) Destroy(glowMaterial);
             if (haloMaterial != null) Destroy(haloMaterial);
-            if (trailMaterial != null) Destroy(trailMaterial);
         }
     }
 }

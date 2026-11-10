@@ -125,8 +125,12 @@ namespace TurtleGame.Editor
                 if (fps != 30)
                     Assert(maxSideStep > 2.5f, "Moon goes around the low log at " + fps + " FPS");
                 Vector3 end = (Vector3)Get("basePosition");
-                Assert(Vector2.Distance(new Vector2(end.x, end.z), new Vector2(0f, 120f)) < 0.01f,
+                Assert(Vector2.Distance(new Vector2(end.x, end.z), new Vector2(0f, 122f)) < 0.01f,
                     "Moon reaches the final waypoint");
+                Bounds road = GameObject.Find("Coastal road").GetComponent<BoxCollider>().bounds;
+                Assert(end.x > road.min.x && end.x < road.max.x &&
+                    end.z > road.min.z + 2f && end.z < road.max.z,
+                    "Moon stops visibly inside the asphalt, beyond the sand boundary");
                 Debug.Log("MOON_GUIDE_ROUTE_OK: " + fps + " FPS; " + frame + " simulated frames.");
             }
 
@@ -169,6 +173,7 @@ namespace TurtleGame.Editor
             {
                 float ground = terrain.SampleHeight(collider.bounds.center) + terrain.transform.position.y;
                 Assert(collider is TerrainCollider || collider.transform.IsChildOf(player) ||
+                    collider.GetComponentInParent<MoonProgressBarriers>() != null ||
                     (allowWalkableSurface && collider.bounds.max.y <= ground + 0.15f),
                     "No intersection with " + collider.name + " at " + position);
             }

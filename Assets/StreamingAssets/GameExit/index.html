@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sea of Lights</title>
+  <style>
+    @font-face { font-family: Outfit; src: url("OutfitSemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #090812; color: #fff; }
+    body { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px; font-family: Outfit, sans-serif; text-align: center; }
+    main { max-width: 600px; }
+    h1 { font-size: clamp(28px, 6vw, 46px); margin: 0 0 16px; font-weight: 600; }
+    p { font-size: clamp(18px, 3vw, 24px); margin: 0 0 32px; opacity: .85; }
+    button { min-height: 56px; padding: 12px 32px; border: 1px solid #ffffff80; border-radius: 8px; background: #ffffff16; color: #fff; font: inherit; font-size: 22px; cursor: pointer; }
+    button:hover, button:focus-visible { background: #ffffff30; outline: 2px solid white; outline-offset: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Thanks for playing</h1>
+    <p>The game has ended.</p>
+    <button id="play-again" type="button">Play again</button>
+  </main>
+  <script>
+    document.getElementById("play-again").addEventListener("click", function () {
+      var game = new URLSearchParams(window.location.search).get("game");
+      var target = new URL(game || "../../index.html", window.location.href);
+      if (target.origin === window.location.origin && /^https?:$/.test(target.protocol)) {
+        window.location.replace(target.href);
+      }
+    });
+  </script>
+</body>
+</html>

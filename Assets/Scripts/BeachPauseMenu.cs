@@ -94,14 +94,7 @@ public class PauseMenuManager : MonoBehaviour
 
     public void QuitGame()
     {
-        // Restore time before leaving.
-        Time.timeScale = 1f;
-
-        #if UNITY_EDITOR
-        Debug.Log("Quit Game only works in a built game.");
-        #else
-        Application.Quit();
-        #endif
+        TurtleGame.GameExit.Quit();
     }
 
     private static bool EscapePressed()

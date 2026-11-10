@@ -85,7 +85,7 @@ namespace TurtleGame.Editor
             engine.spatialBlend = 1f;
             engine.minDistance = 5f;
             engine.maxDistance = 45f;
-            engine.volume = 0.8f;
+            engine.volume = 0.95f;
             engine.pitch = 1.2f;
             car.transform.SetPositionAndRotation(new Vector3(-25f, road.bounds.max.y, road.bounds.min.z + 1f),
                 Quaternion.LookRotation(Vector3.right));

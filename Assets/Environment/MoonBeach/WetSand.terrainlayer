@@ -8,7 +8,7 @@ TerrainLayer:
   m_PrefabAsset: {fileID: 0}
   m_Name: WetSand
   m_DiffuseTexture: {fileID: 2800000, guid: b71da6f3e6826694fbbbc5fedf0d9445, type: 3}
-  m_NormalMapTexture: {fileID: 2800000, guid: 9984368f00065214586177827a40dd55, type: 3}
+  m_NormalMapTexture: {fileID: 2800000, guid: e98b29350ac047b4ba7b6a7ea97d465f, type: 3}
   m_MaskMapTexture: {fileID: 0}
   m_TileSize: {x: 5, y: 5}
   m_TileOffset: {x: 0, y: 0}

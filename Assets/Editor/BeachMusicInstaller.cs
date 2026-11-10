@@ -11,7 +11,7 @@ namespace TurtleGame.Editor
     {
         public const string ClipPath = "Assets/Audio/Dreamy Night.mp3";
 
-        [MenuItem("Turtle Game/Instalar música de playa y disco rayado")]
+        [MenuItem("Turtle Game/Instalar música de playa")]
         public static void Install()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -31,7 +31,7 @@ namespace TurtleGame.Editor
             if (importer == null)
                 throw new InvalidOperationException("Import Dreamy Night.mp3 into Assets/Audio first.");
             var settings = importer.defaultSampleSettings;
-            // Sample-accurate rewinds need decoded audio rather than streaming seeks.
+            // Preload the calm track so gameplay can start without an audio loading gap.
             settings.loadType = AudioClipLoadType.DecompressOnLoad;
             settings.compressionFormat = AudioCompressionFormat.Vorbis;
             settings.quality = 0.8f;
@@ -43,12 +43,6 @@ namespace TurtleGame.Editor
             var music = Object.FindFirstObjectByType<BeachMusic>();
             if (music == null)
                 music = new GameObject("Beach music - Dreamy Night").AddComponent<BeachMusic>();
-            var guide = Object.FindFirstObjectByType<MoonFairyGuide>();
-            if (guide == null)
-                throw new InvalidOperationException("The beach needs a moon guide to trigger the record scratch.");
-            var musicSettings = new SerializedObject(music);
-            musicSettings.FindProperty("moonGuide").objectReferenceValue = guide;
-            musicSettings.ApplyModifiedPropertiesWithoutUndo();
             var source = music.GetComponent<AudioSource>();
             source.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(ClipPath);
             source.playOnAwake = false;
@@ -65,7 +59,7 @@ namespace TurtleGame.Editor
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             Debug.Log("BEACH_MUSIC_INSTALLED: Dreamy Night; " + source.clip.length.ToString("F1") +
-                " seconds; a brief scratch breaks the calm at the moon's final stop; the engine plays alone.");
+                " seconds; music stays calm until road contact, then the engine plays alone.");
         }
 
         public static void InstallAndVerify()

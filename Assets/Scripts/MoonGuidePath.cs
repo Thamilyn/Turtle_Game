@@ -33,7 +33,8 @@ namespace TurtleGame
                 foreach (Collider collider in root.GetComponentsInChildren<Collider>())
                 {
                     if (!collider.enabled || collider.isTrigger || collider is TerrainCollider ||
-                        collider.transform.IsChildOf(player))
+                        collider.transform.IsChildOf(player) ||
+                        collider.GetComponentInParent<MoonProgressBarriers>() != null)
                         continue;
 
                     Bounds bounds = collider.bounds;

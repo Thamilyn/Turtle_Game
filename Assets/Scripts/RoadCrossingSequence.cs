@@ -21,10 +21,12 @@ namespace TurtleGame
         [SerializeField] private string endingScene = "Ending_Scene";
 
         [Header("Pasada del automóvil")]
-        [SerializeField, Min(1f)] private float approachDistance = 18f;
+        [SerializeField, Min(0.1f)] private float approachDistance = 2.2f;
         [SerializeField, Min(1f)] private float carSpeed = 22f;
+        [SerializeField, Range(0f, 1f)] private float engineVolume = 0.95f;
         [SerializeField, Min(0.01f)] private float wheelRadius = 0.34f;
         [SerializeField] private Vector3 cameraOffset = new Vector3(0f, 3f, -7f);
+        [SerializeField, Min(0.1f)] private float automaticApproachDistance = 0.1f;
 
         [Header("Palpito negro y rojo")]
         [SerializeField, Min(1)] private int heartbeatCount = 3;
@@ -45,6 +47,9 @@ namespace TurtleGame
         private Quaternion cameraRotation;
         private Vector3 crossingPoint;
         private float previousCarDistance;
+        private MoonFairyGuide moonGuide;
+        private bool automaticApproach;
+        private bool playerReadKeyboard;
 
         private void Awake()
         {
@@ -56,7 +61,10 @@ namespace TurtleGame
             }
             character = player.GetComponent<CharacterController>();
             if (viewingCamera != null)
+            {
                 followCamera = viewingCamera.GetComponent<TurtleFollowCamera>();
+                moonGuide = viewingCamera.GetComponent<MoonFairyGuide>();
+            }
             car.gameObject.SetActive(false);
             screenOverlay.gameObject.SetActive(false);
         }
@@ -66,13 +74,26 @@ namespace TurtleGame
             if (HasStarted || Time.timeScale <= 0f || !player.isActiveAndEnabled || !character.enabled)
                 return;
 
-            // Detect the feet touching the actual asphalt, including entry from either side.
-            // Height prevents triggering while the turtle is above or below the road.
-            Bounds feet = character.bounds;
             Bounds road = roadSurface.bounds;
-            bool overlaps = feet.max.x > road.min.x && feet.min.x < road.max.x &&
-                            feet.max.z > road.min.z && feet.min.z < road.max.z;
-            if (overlaps && player.IsGrounded && Mathf.Abs(feet.min.y - road.max.y) < 0.3f)
+            Bounds feet = character.bounds;
+            if (!automaticApproach && moonGuide != null && moonGuide.HasReachedRoad &&
+                player.IsGrounded && feet.center.x > road.min.x && feet.center.x < road.max.x &&
+                feet.max.z >= road.min.z - automaticApproachDistance && feet.min.z < road.min.z)
+            {
+                automaticApproach = true;
+                playerReadKeyboard = player.ReadKeyboard;
+                player.ReadKeyboard = false;
+                player.BeginAutomaticMovement(Vector2.up);
+            }
+
+            // A collider grazing the edge is not a visible step onto the asphalt.
+            // Keep walking until the turtle's center is clearly inside the road.
+            const float stepOntoAsphalt = 0.25f;
+            bool onAsphalt = feet.center.x > road.min.x + stepOntoAsphalt &&
+                             feet.center.x < road.max.x - stepOntoAsphalt &&
+                             feet.center.z > road.min.z + stepOntoAsphalt &&
+                             feet.center.z < road.max.z - stepOntoAsphalt;
+            if (onAsphalt && player.IsGrounded && Mathf.Abs(feet.min.y - road.max.y) < 0.3f)
                 BeginCrossing();
         }
 
@@ -115,7 +136,11 @@ namespace TurtleGame
             car.rotation = Quaternion.LookRotation(Vector3.right);
             car.gameObject.SetActive(true);
             if (engine != null)
+            {
+                engine.volume = engineVolume;
+                engine.timeSamples = 0;
                 engine.Play();
+            }
             StartCoroutine(PlayEncounter());
         }
 
@@ -129,7 +154,7 @@ namespace TurtleGame
                 MoveCar(elapsed);
                 if (viewingCamera != null)
                 {
-                    float blend = Mathf.SmoothStep(0f, 1f, elapsed / 0.45f);
+                    float blend = Mathf.SmoothStep(0f, 1f, elapsed / 0.08f);
                     Vector3 destination = player.transform.position + cameraOffset;
                     viewingCamera.transform.position = Vector3.Lerp(cameraStart, destination, blend);
                     Quaternion rotation = Quaternion.LookRotation(
@@ -141,6 +166,8 @@ namespace TurtleGame
 
             screenOverlay.color = Color.black;
             screenOverlay.gameObject.SetActive(true);
+            if (beachMusic != null)
+                beachMusic.StopMusic();
             float pulseElapsed = 0f;
             float pulseDuration = heartbeatCount * heartbeatDuration;
             while (pulseElapsed < pulseDuration)
@@ -154,7 +181,11 @@ namespace TurtleGame
                 float second = Beat(phase, 0.32f, 0.18f) * 0.65f;
                 screenOverlay.color = Color.Lerp(Color.black, heartbeatRed, Mathf.Max(first, second));
                 if (engine != null)
-                    engine.volume = Mathf.Lerp(0.8f, 0f, Mathf.Clamp01(pulseElapsed / 0.7f));
+                {
+                    engine.volume = Mathf.Lerp(engineVolume, 0f, Mathf.Clamp01(pulseElapsed / 0.7f));
+                    if (pulseElapsed >= 0.7f && engine.isPlaying)
+                        engine.Stop();
+                }
                 yield return null;
             }
             screenOverlay.color = Color.black;
@@ -186,6 +217,11 @@ namespace TurtleGame
         private void OnDisable()
         {
             StopAllCoroutines();
+            if (automaticApproach && player != null)
+            {
+                player.EndAutomaticMovement();
+                player.ReadKeyboard = playerReadKeyboard;
+            }
             if (!HasStarted)
                 return;
             if (beachMusic != null)
